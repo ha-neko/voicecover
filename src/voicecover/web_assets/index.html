@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171712">
+  <title>Voicecover — video dubbing</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Voicecover home">
+      <span class="brand-mark">V</span>
+      <span>voicecover</span>
+    </a>
+    <div class="status-pill"><i></i> local processing</div>
+  </header>
+
+  <main>
+    <section class="intro">
+      <p class="eyebrow">Translate. Localize. Synchronize.</p>
+      <h1>Your video,<br><em>in another language.</em></h1>
+      <p class="lede">Localize speech, on-screen text, or both. Processing stays local, with original Arabic and media preserved where requested.</p>
+    </section>
+
+    <section class="workspace">
+      <form id="dub-form" class="panel">
+        <div class="panel-heading">
+          <span>01</span>
+          <div><h2>Create a dub</h2><p>Choose a source and tune the result.</p></div>
+        </div>
+
+        <div class="source-tabs" role="tablist">
+          <button type="button" class="tab active" data-source="upload">Upload video</button>
+          <button type="button" class="tab" data-source="youtube">YouTube URL</button>
+        </div>
+
+        <label class="dropzone" id="dropzone">
+          <input type="file" id="video" name="videos" accept="video/*,.mkv,.mov,.webm" multiple>
+          <span class="upload-icon">↗</span>
+          <strong id="file-label">Drop your video here</strong>
+          <small>or click to browse · one or more MP4, MKV, MOV, WebM files</small>
+        </label>
+        <label class="url-field hidden" id="url-field">
+          <span>YouTube URL</span>
+          <input type="url" id="youtube-url" name="youtube_url" placeholder="https://youtube.com/watch?v=...">
+        </label>
+
+        <label><span>Series profile</span><select name="profile" id="profile-picker"><option value="">Custom settings</option></select><small id="profile-help">Use a built-in or saved series configuration.</small></label>
+
+        <fieldset class="mode-selector">
+          <legend>Localization mode</legend>
+          <label class="mode-card">
+            <input type="radio" name="localization_mode" value="full" checked>
+            <span class="mode-icon">AV</span>
+            <b><strong>Full localization</strong><small>Dub speech and translate on-screen text</small></b>
+          </label>
+          <label class="mode-card">
+            <input type="radio" name="localization_mode" value="sound">
+            <span class="mode-icon">A</span>
+            <b><strong>Sound only</strong><small>New dub, untouched original video</small></b>
+          </label>
+          <label class="mode-card">
+            <input type="radio" name="localization_mode" value="visual">
+            <span class="mode-icon">V</span>
+            <b><strong>Visual only</strong><small>Translated slides, original soundtrack</small></b>
+          </label>
+          <input type="hidden" name="visual_only" value="false">
+          <input type="hidden" name="sound_only" value="false">
+        </fieldset>
+
+        <div class="form-grid language-grid">
+          <label><span>From</span><select id="source-language" name="source_language"><option value="" selected>Auto detect</option><option value="en">English</option><option value="id">Indonesian</option><option value="ar">Arabic</option><option value="ms">Malay</option><option value="fr">French</option><option value="es">Spanish</option><option value="de">German</option><option value="pt">Portuguese</option><option value="ja">Japanese</option><option value="ko">Korean</option><option value="zh">Chinese</option><option value="ru">Russian</option><option value="hi">Hindi</option><option value="tr">Turkish</option><option value="ur">Urdu</option></select></label>
+          <div class="direction">→</div>
+          <label><span>Into</span><input name="target_language" value="id" placeholder="id, en, ja..." required></label>
+        </div>
+
+        <div class="form-grid">
+          <label data-speech-control><span>Whisper model</span><select name="model"><option>tiny</option><option>base</option><option selected>small</option><option>medium</option><option>large-v3</option></select></label>
+          <label><span>Translation</span><select name="translator"><option value="auto" selected>Auto · Google + NLLB fallback</option><option value="nllb">NLLB · offline</option><option value="google">Google · online</option><option value="argos">Argos · compact</option><option value="llm">LLM · local chat completions</option></select></label>
+        </div>
+
+        <div class="form-grid output-options">
+          <label data-speech-control><span>TTS voice</span><select name="voice" id="voice-picker"><option value="">Automatic · male</option></select><small id="voice-help">Male voice is selected by default.</small></label>
+          <label class="subtitle-option" data-speech-control><span>Subtitle output</span><span class="check-card"><input type="checkbox" name="write_subtitles" checked><b><strong>Export .srt</strong><small>Translated, timestamped subtitles</small></b></span></label>
+        </div>
+
+        <details>
+          <summary>Advanced controls <span>＋</span></summary>
+          <div class="advanced form-grid">
+            <label data-speech-control><span>Compute device</span><select name="device"><option>cpu</option><option>auto</option><option>cuda</option></select></label>
+            <label class="full" data-speech-control><span>Whisper context</span><input name="initial_prompt" placeholder="Topic, names, specialist vocabulary..."></label>
+            <label class="full" data-speech-control><span>Original soundtrack <b id="volume-value">15%</b></span><input type="range" name="original_volume" min="0" max="1" value="0.15" step="0.05"></label>
+            <label class="check" data-speech-control><input type="checkbox" name="preserve_arabic" checked><span>Keep Arabic passages untranslated</span></label>
+            <label class="check" data-speech-control><input type="checkbox" name="natural_speech" checked><span>Natural speech grouping</span></label>
+            <label class="check" data-visual-control><input type="checkbox" name="visual_context" checked><span>Visual context (OCR whiteboard/on-screen text)</span></label>
+            <label class="check" data-visual-control><input type="checkbox" name="write_visual_track"><span>Export visual OCR track</span></label>
+            <label class="check" data-visual-control><input type="checkbox" name="localize_visual_text"><span>Localize static on-screen text</span></label>
+            <label class="check" data-speech-control><input type="checkbox" name="voice_clone" checked><span>Clone the original presenter's voice with F5-TTS (not an LLM voice)</span></label>
+            <label data-speech-control><span>Clone quality / speed</span><select name="clone_nfe"><option value="16">Fast · 16 steps</option><option value="24">Balanced · 24 steps</option><option value="32" selected>High quality · 32 steps</option></select><small>Lower steps synthesize faster; higher steps refine voice quality.</small></label>
+            <label class="full hidden" id="clone-model-field" data-speech-control><span>Clone model (Hugging Face repo)</span><input name="clone_model" placeholder="Eempostor/F5-TTS-INDO-FINETUNE-V2"></label>
+            <label class="check" data-speech-control><input type="checkbox" name="write_segments"><span>Export segment metadata</span></label>
+            <label class="check" data-speech-control><input type="checkbox" name="write_bilingual"><span>Bilingual subtitles (original + translation)</span></label>
+            <label class="check"><input type="checkbox" name="install_models" checked><span>Download missing models</span></label>
+          </div>
+        </details>
+
+        <button class="primary" id="submit" type="submit"><span>Create dubbed video</span><b>→</b></button>
+        <p class="form-error" id="form-error" role="alert"></p>
+      </form>
+
+      <aside class="process-card" id="process-card">
+        <div class="panel-heading light">
+          <span>02</span>
+          <div><h2>Processing room</h2><p id="process-caption">Waiting for a video.</p></div>
+        </div>
+        <div class="visualizer" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="job-progress">
+          <div class="job-progress-copy"><span id="progress-label">Waiting</span><strong id="progress-percent">0%</strong></div>
+          <div class="job-progress-track" id="progress-track" role="progressbar" aria-label="Video processing progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <i id="progress-fill"></i>
+          </div>
+        </div>
+        <div class="job-timing" aria-live="polite">
+          <div><span id="elapsed-label">Elapsed</span><strong id="elapsed-time">00:00</strong></div>
+          <div><span>First started</span><strong id="started-time">—</strong></div>
+          <div><span>Attempts</span><strong id="attempt-count">—</strong></div>
+        </div>
+        <ol class="steps" id="steps">
+          <li data-key="extract"><i>1</i><div><strong>Extract audio</strong><small>Prepare the soundtrack</small></div></li>
+          <li data-key="transcribe"><i>2</i><div><strong>Transcribe</strong><small>Whisper speech recognition</small></div></li>
+          <li data-key="translate"><i>3</i><div><strong>Translate</strong><small>Convert every segment</small></div></li>
+          <li data-key="voice"><i>4</i><div><strong>Generate voice</strong><small>Synthesize translated speech</small></div></li>
+          <li data-key="create"><i>5</i><div><strong>Synchronize & mux</strong><small>Build the finished video</small></div></li>
+        </ol>
+        <div class="console" id="console"><span>voicecover is ready.</span></div>
+        <div class="result hidden" id="result">
+          <strong>Your dub is ready.</strong>
+          <div><a id="video-link" class="download" href="#">Download video</a><a id="subtitle-link" href="#">Subtitles</a></div>
+        </div>
+        <button class="retry hidden" id="pause" type="button">Pause job</button>
+        <button class="retry hidden" id="discard" type="button">Discard paused job</button>
+        <button class="retry hidden" id="retry" type="button">Retry interrupted or failed job</button>
+      </aside>
+    </section>
+
+    <section class="job-vault" id="job-vault">
+      <div class="panel-heading">
+        <span>03</span>
+        <div><h2>Job vault</h2><p>Every submitted video — pause, retry, inspect the log, or delete.</p></div>
+      </div>
+      <div class="job-list" id="job-list"><p class="jobs-empty">No jobs yet — submit a video above.</p></div>
+    </section>
+  </main>
+
+  <footer><span>VOICECOVER / LOCAL-FIRST DUBBING</span><span>Whisper · local LLM translation · F5 voice clone · FFmpeg</span></footer>
+  <script src="/app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+build/
+dist/
+*.egg-info/
+.dev-runtime/
+# media artifacts stay out of the repo
+*.mp4
+*.wav
+*.m4a
+*.mkv
+*.zip
+*.ipynb
