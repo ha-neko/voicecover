@@ -287,7 +287,10 @@ def test_overlong_speech_regenerates_at_faster_rate(monkeypatch, tmp_path: Path)
     )
     assert result == tmp_path / "speech-00003.wav"
     assert rates == [None, "+20%"]
-    assert messages == ["  voice 1/1 utterances"]
+    assert messages == [
+        "  tempo +20% utterance 4 (6.00s speech > 4.00s slot)",
+        "  voice 1/1 utterances",
+    ]
 
 
 def test_on_tempo_speech_is_not_regenerated(monkeypatch, tmp_path: Path) -> None:

@@ -470,6 +470,10 @@ async def _synthesize_one(
         tempo = adaptive_rate(initial_duration, max(segment.duration, 0.1))
         if tempo:
             await render_chunks(tempo)
+            progress(
+                f"  tempo {tempo} utterance {index + 1} "
+                f"({initial_duration:.2f}s speech > {segment.duration:.2f}s slot)"
+            )
             _LOG.info(
                 "utterance %d regenerated at rate %s (%.2fs speech -> %.2fs slot)",
                 index + 1,
