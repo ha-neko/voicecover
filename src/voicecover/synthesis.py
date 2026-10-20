@@ -410,6 +410,15 @@ async def _synthesize_one(
     def contains_arabic(value: str) -> bool:
         return any("ARABIC" in unicodedata.name(c, "") for c in value if c.isalpha())
 
+    def speakable(value: str) -> bool:
+        # Arabic presentation ligatures (e.g. the ﷺ blessing) carry no
+        # pronunciation; Edge TTS answers such chunks with no audio, so only
+        # chunks containing real letters count as speech.
+        return any(
+            char.isalpha() and "LIGATURE" not in unicodedata.name(char, "")
+            for char in value
+        )
+
     # Mixed Indonesian/Arabic utterances need both voices: Indonesian prose is
     # translated and spoken normally, while Arabic tokens remain Arabic and are
     # pronounced by the Arabic neural voice.
@@ -433,6 +442,10 @@ async def _synthesize_one(
         for chunk_index, (chunk, selected_voice) in enumerate(chunks):
             raw = output_dir / f"speech-{index:05d}-{chunk_index:03d}.mp3"
             wav = output_dir / f"speech-{index:05d}-{chunk_index:03d}.wav"
+            if not speakable(chunk):
+                make_silence(wav, 0.12)
+                decoded.append(wav)
+                continue
             async with semaphore:
                 await _save_with_retry(
                     lambda value=chunk, voice=selected_voice, tempo=rate: (

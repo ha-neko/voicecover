@@ -335,3 +335,56 @@ def test_on_tempo_speech_is_not_regenerated(monkeypatch, tmp_path: Path) -> None
         )
     )
     assert rates == [None]
+
+
+def test_ligature_only_chunk_becomes_pause_not_tts(monkeypatch, tmp_path: Path) -> None:
+    """The ﷺ ligature has no pronunciation; Edge TTS rejects it, so it must
+    become a short pause and never reach the service."""
+    import asyncio
+    import sys
+    import types
+
+    calls: list[tuple[str, str]] = []
+
+    class FakeCommunicate:
+        def __init__(self, text, voice, rate=None, **kwargs):
+            calls.append((text, voice))
+
+        async def save(self, path):
+            Path(path).write_bytes(b"x" * 300)
+
+    fake_edge = types.SimpleNamespace(
+        Communicate=lambda text, voice, rate=None, **kwargs: FakeCommunicate(
+            text, voice, rate
+        )
+    )
+    monkeypatch.setitem(sys.modules, "edge_tts", fake_edge)
+    monkeypatch.setattr(synthesis, "duration", lambda path: 3.0)
+    monkeypatch.setattr(
+        synthesis,
+        "concatenate",
+        lambda parts, manifest, output: Path(output).write_bytes(b"z" * 400),
+    )
+    monkeypatch.setattr(
+        synthesis,
+        "decode_speech",
+        lambda raw, wav: Path(wav).write_bytes(b"y" * 300),
+    )
+    messages: list[str] = []
+    result = asyncio.run(
+        synthesis._synthesize_one(
+            5,
+            Segment(0.0, 4.0, "Nabi ﷺ ke Madinah."),
+            tmp_path,
+            "id-ID-ArdiNeural",
+            "ar-SA-HamedNeural",
+            asyncio.Semaphore(1),
+            messages.append,
+            [0, 1],
+            asyncio.Lock(),
+        )
+    )
+    assert result == tmp_path / "speech-00005.wav"
+    # only the two Indonesian chunks reach TTS; the ligature stays silent
+    assert [voice for _, voice in calls] == ["id-ID-ArdiNeural", "id-ID-ArdiNeural"]
+    assert all("ﷺ" not in text for text, _ in calls)
