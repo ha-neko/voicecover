@@ -389,10 +389,12 @@ async def _synthesize_one(
 
     # Quran recitation and other Arabic passages should remain the original
     # recording even when Indonesian narration uses a generic neural voice.
-    if (
-        source_audio is not None
-        and is_arabic_passage(segment.text)
-        and not has_english_latin_text(segment.text)
+    # Match the clone path: an Arabic *target* also keeps the original, so
+    # Arabic script in the translation is spoken by the teacher, not the voice.
+    target = segment.translated_text if segment.translated_text is not None else segment.text
+    if source_audio is not None and (
+        is_arabic_passage(segment.text) and not has_english_latin_text(segment.text)
+        or is_arabic_passage(target) and not has_english_latin_text(target)
     ):
         await asyncio.to_thread(
             extract_audio_range, source_audio, output, segment.start, segment.end

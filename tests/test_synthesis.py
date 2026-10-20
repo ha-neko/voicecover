@@ -388,3 +388,39 @@ def test_ligature_only_chunk_becomes_pause_not_tts(monkeypatch, tmp_path: Path) 
     # only the two Indonesian chunks reach TTS; the ligature stays silent
     assert [voice for _, voice in calls] == ["id-ID-ArdiNeural", "id-ID-ArdiNeural"]
     assert all("ﷺ" not in text for text, _ in calls)
+
+
+def test_arabic_target_preserves_original_audio(monkeypatch, tmp_path: Path) -> None:
+    """An Arabic-script translation keeps the teacher's own recitation even
+    when the source transcript is Latin."""
+    import asyncio
+
+    calls: list[tuple[float, float]] = []
+    monkeypatch.setattr(
+        synthesis,
+        "extract_audio_range",
+        lambda source, output, start, end: (calls.append((start, end)), output.touch()),
+    )
+    messages: list[str] = []
+    result = asyncio.run(
+        synthesis._synthesize_one(
+            0,
+            Segment(
+                0.1,
+                8.4,
+                "Bismillah alhamdulillah wassalatu wassalamu ala rasulillah",
+                translated_text="بسم الله، الحمد لله، والصلاة والسلام على رسول الله",
+            ),
+            tmp_path,
+            "id-ID-ArdiNeural",
+            "ar-SA-HamedNeural",
+            asyncio.Semaphore(1),
+            messages.append,
+            [0, 1],
+            asyncio.Lock(),
+            tmp_path / "source.wav",
+        )
+    )
+    assert result == tmp_path / "speech-00000.wav"
+    assert calls == [(0.1, 8.4)]
+    assert messages == ["  original Arabic 1/1 utterances"]
