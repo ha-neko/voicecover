@@ -236,3 +236,99 @@ def test_garbled_segment_falls_back_to_silence_without_source(monkeypatch, tmp_p
     assert result == tmp_path / "speech-00005.wav"
     assert silences == [3.0]
     assert messages == ["  silence 1/1 utterances"]
+
+
+def test_overlong_speech_regenerates_at_faster_rate(monkeypatch, tmp_path: Path) -> None:
+    """Speech longer than its slot must be redone with an Edge TTS rate."""
+    import asyncio
+    import sys
+    import types
+
+    rates: list[str | None] = []
+
+    class FakeCommunicate:
+        def __init__(self, text, voice, rate=None, **kwargs):
+            rates.append(rate)
+            self._path = None
+
+        def _bind(self, path):
+            self._path = path
+            return self
+
+        async def save(self, path):
+            Path(path).write_bytes(b"x" * 300)
+
+    fake_edge = types.SimpleNamespace(
+        Communicate=lambda text, voice, rate=None, **kwargs: FakeCommunicate(
+            text, voice, rate
+        )._bind(None)
+    )
+    monkeypatch.setitem(sys.modules, "edge_tts", fake_edge)
+    # every duration read reports 6s of speech for a 4s slot -> +20% tempo
+    monkeypatch.setattr(synthesis, "duration", lambda path: 6.0)
+    monkeypatch.setattr(
+        synthesis,
+        "decode_speech",
+        lambda raw, wav: Path(wav).write_bytes(b"y" * 300),
+    )
+    messages: list[str] = []
+    result = asyncio.run(
+        synthesis._synthesize_one(
+            3,
+            Segment(0.0, 4.0, "Belajar membaca Al-Qur'an dan tajwid."),
+            tmp_path,
+            "id-ID-ArdiNeural",
+            None,
+            asyncio.Semaphore(1),
+            messages.append,
+            [0, 1],
+            asyncio.Lock(),
+        )
+    )
+    assert result == tmp_path / "speech-00003.wav"
+    assert rates == [None, "+20%"]
+    assert messages == ["  voice 1/1 utterances"]
+
+
+def test_on_tempo_speech_is_not_regenerated(monkeypatch, tmp_path: Path) -> None:
+    import asyncio
+    import sys
+    import types
+
+    rates: list[str | None] = []
+
+    class FakeCommunicate:
+        def __init__(self, text, voice, rate=None, **kwargs):
+            rates.append(rate)
+
+        async def save(self, path):
+            Path(path).write_bytes(b"x" * 300)
+
+    fake_edge = types.SimpleNamespace(
+        Communicate=lambda text, voice, rate=None, **kwargs: FakeCommunicate(
+            text, voice, rate
+        )
+    )
+    monkeypatch.setitem(sys.modules, "edge_tts", fake_edge)
+    # 3.5s of speech fits its 4s slot: single pass, no rate
+    monkeypatch.setattr(synthesis, "duration", lambda path: 3.5)
+    monkeypatch.setattr(
+        synthesis,
+        "decode_speech",
+        lambda raw, wav: Path(wav).write_bytes(b"y" * 300),
+    )
+    messages: list[str] = []
+    asyncio.run(
+        synthesis._synthesize_one(
+            4,
+            Segment(0.0, 4.0, "Belajar membaca Al-Qur'an dan tajwid."),
+            tmp_path,
+            "id-ID-ArdiNeural",
+            None,
+            asyncio.Semaphore(1),
+            messages.append,
+            [0, 1],
+            asyncio.Lock(),
+        )
+    )
+    assert rates == [None]

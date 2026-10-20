@@ -426,13 +426,21 @@ async def _synthesize_one(
         for chunk in chunk_text(part)
     ]
     decoded: list[Path] = []
-    try:
+
+    async def render_chunks(rate: str | None) -> None:
+        """Generate every chunk of this utterance, optionally at an Edge TTS rate."""
+        decoded.clear()
         for chunk_index, (chunk, selected_voice) in enumerate(chunks):
             raw = output_dir / f"speech-{index:05d}-{chunk_index:03d}.mp3"
             wav = output_dir / f"speech-{index:05d}-{chunk_index:03d}.wav"
             async with semaphore:
                 await _save_with_retry(
-                    lambda value=chunk: edge_tts.Communicate(value, selected_voice), raw
+                    lambda value=chunk, voice=selected_voice, tempo=rate: (
+                        edge_tts.Communicate(value, voice, rate=tempo)
+                        if tempo
+                        else edge_tts.Communicate(value, voice)
+                    ),
+                    raw,
                 )
             if raw.stat().st_size < 256:
                 raise RuntimeError("TTS returned an incomplete audio file")
@@ -451,6 +459,24 @@ async def _synthesize_one(
                     make_silence(pause, 0.08)
                     parts.append(pause)
             concatenate(parts, output_dir / f"speech-{index:05d}.txt", output)
+
+    try:
+        await render_chunks(None)
+        # Speech that overruns its slot is what pushes the dub behind the
+        # video: the timeline only recovers part of the overrun, and the rest
+        # accumulates for every following utterance. Regenerate at a faster
+        # Edge TTS rate while the speech is still clear.
+        initial_duration = duration(output)
+        tempo = adaptive_rate(initial_duration, max(segment.duration, 0.1))
+        if tempo:
+            await render_chunks(tempo)
+            _LOG.info(
+                "utterance %d regenerated at rate %s (%.2fs speech -> %.2fs slot)",
+                index + 1,
+                tempo,
+                initial_duration,
+                segment.duration,
+            )
     except Exception as exc:
         raise RuntimeError(
             f"Speech synthesis failed for utterance {index + 1}; no text was dropped: {exc}"
